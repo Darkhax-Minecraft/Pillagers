@@ -17,7 +17,7 @@ import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
-@Mod(modid = "anvilcheese", name = "Anvil Cheese", version = "@VERSION@", certificateFingerprint = "@FINGERPRINT@")
+@Mod(modid = "pillagers", name = "Pillagers", version = "@VERSION@", certificateFingerprint = "@FINGERPRINT@")
 public class Pillagers {
 
     public static ConfigurationHandler config = new ConfigurationHandler("config/pillagers.cfg");
