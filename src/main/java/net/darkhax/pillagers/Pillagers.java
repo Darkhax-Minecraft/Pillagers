@@ -47,26 +47,30 @@ public class Pillagers {
                 }
                 
                 final MerchantRecipeList trades = villager.getRecipes(player);
-                ItemStack item = new ItemStack(Items.EMERALD);
-                int attempts = 0;
                 
-                // Makes three attempts to find a valid recipe.
-                while (attempts < 3) {
+                if (!trades.isEmpty()) {
+                	
+                    ItemStack item = new ItemStack(Items.EMERALD);
+                    int attempts = 0;
                     
-                	// Gets a random recipe from the villager's trades with the player.
-                    final MerchantRecipe recipe = trades.get(Constants.RANDOM.nextInt(trades.size()));
-                    
-                    // Recipe can't be disabled, and must have a buying item and a selling item.
-                    if (!recipe.isRecipeDisabled() && !recipe.getItemToSell().isEmpty() && !recipe.getItemToBuy().isEmpty()) {
+                    // Makes three attempts to find a valid recipe.
+                    while (attempts < 3) {
                         
-                        item = recipe.getItemToSell().copy();
-                        break;
+                    	// Gets a random recipe from the villager's trades with the player.
+                        final MerchantRecipe recipe = trades.get(Constants.RANDOM.nextInt(trades.size()));
+                        
+                        // Recipe can't be disabled, and must have a buying item and a selling item.
+                        if (!recipe.isRecipeDisabled() && !recipe.getItemToSell().isEmpty() && !recipe.getItemToBuy().isEmpty()) {
+                            
+                            item = recipe.getItemToSell().copy();
+                            break;
+                        }
+                        
+                        attempts++;
                     }
                     
-                    attempts++;
+                    EntityUtils.addDrop(item, event);
                 }
-                
-                EntityUtils.addDrop(item, event);
         	}
         }
     }
