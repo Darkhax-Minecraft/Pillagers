@@ -20,22 +20,30 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 @Mod(modid = "pillagers", name = "Pillagers", version = "@VERSION@", dependencies = "required-after:bookshelf@[2.3.526,);", certificateFingerprint = "@FINGERPRINT@")
 public class Pillagers {
 
-    private static ConfigurationHandler config = new ConfigurationHandler("config/pillagers.cfg");
+    /**
+     * An instance of the mod's configuration properties. This is initialized when the mod has
+     * been loaded.
+     */
+    private ConfigurationHandler config;
 
     @EventHandler
     public void onPreInit (FMLPreInitializationEvent event) {
 
         MinecraftForge.EVENT_BUS.register(this);
+        this.config = new ConfigurationHandler(event.getSuggestedConfigurationFile());
     }
 
     @SubscribeEvent
     public void onMobKilled (LivingDropsEvent event) {
 
-        // Checks if the initial conditions are right. These conditions include a configurable probability based on the looting enchantment, the entity being a villager, and the damage source being from an entity.
-        if (MathsUtils.tryPercentage(ConfigurationHandler.basePercent + ConfigurationHandler.lootingPercent * event.getLootingLevel()) && event.getEntityLiving() instanceof EntityVillager && event.getSource().getTrueSource() != null) {
+        // Checks if the initial conditions are right. These conditions include a configurable
+        // probability based on the looting enchantment, the entity being a villager, and the
+        // damage source being from an entity.
+        if (MathsUtils.tryPercentage(this.config.getBasePercent() + this.config.getLootingPercent() * event.getLootingLevel()) && event.getEntityLiving() instanceof EntityVillager && event.getSource().getTrueSource() != null) {
 
-            // A secondary check to see if the damage was from a player. This check can be bypassed using the configuration file.
-            if (ConfigurationHandler.allowFakePlayers ? PlayerUtils.isPlayerDamage(event.getSource()) : PlayerUtils.isPlayerReal(event.getSource().getTrueSource())) {
+            // A secondary check to see if the damage was from a real player. This check can be
+            // bypassed using the configuration file.
+            if (this.config.areFakePlayersAllowed() ? PlayerUtils.isPlayerDamage(event.getSource()) : PlayerUtils.isPlayerReal(event.getSource().getTrueSource())) {
 
                 final EntityVillager villager = (EntityVillager) event.getEntityLiving();
                 final EntityPlayer player = (EntityPlayer) event.getSource().getTrueSource();
@@ -57,8 +65,8 @@ public class Pillagers {
                             // Gets a random recipe from the villager's trades with the player.
                             final MerchantRecipe recipe = trades.get(Constants.RANDOM.nextInt(trades.size()));
 
-                            // Recipe can't be disabled, and must have a buying item and a selling
-                            // item.
+                            // Recipe can't be disabled, and must have a buying item and a
+                            // selling item.
                             if (!recipe.isRecipeDisabled() && !recipe.getItemToSell().isEmpty() && !recipe.getItemToBuy().isEmpty()) {
 
                                 item = recipe.getItemToSell().copy();
