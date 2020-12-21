@@ -1,86 +1,107 @@
 package net.darkhax.pillagers;
 
-import net.darkhax.bookshelf.lib.Constants;
-import net.darkhax.bookshelf.util.EntityUtils;
-import net.darkhax.bookshelf.util.MathsUtils;
-import net.darkhax.bookshelf.util.PlayerUtils;
-import net.minecraft.entity.passive.EntityVillager;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.item.ItemEntity;
+import net.minecraft.entity.merchant.villager.AbstractVillagerEntity;
+import net.minecraft.entity.merchant.villager.VillagerEntity;
+import net.minecraft.entity.merchant.villager.VillagerProfession;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.village.MerchantRecipe;
-import net.minecraft.village.MerchantRecipeList;
+import net.minecraft.item.Items;
+import net.minecraft.item.MerchantOffer;
+import net.minecraft.item.MerchantOffers;
+import net.minecraft.potion.EffectInstance;
+import net.minecraft.potion.Effects;
+import net.minecraft.world.server.ServerWorld;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.Mod.EventHandler;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
-@Mod(modid = "pillagers", name = "Pillagers", version = "@VERSION@", dependencies = "required-after:bookshelf@[2.3.526,);", certificateFingerprint = "@FINGERPRINT@")
+@Mod("pillagers")
 public class Pillagers {
 
-    /**
-     * An instance of the mod's configuration properties. This is initialized when the mod has
-     * been loaded.
-     */
-    private ConfigurationHandler config;
-
-    @EventHandler
-    public void onPreInit (FMLPreInitializationEvent event) {
-
-        MinecraftForge.EVENT_BUS.register(this);
-        this.config = new ConfigurationHandler(event.getSuggestedConfigurationFile());
-    }
+	private final Configuration config;
+	
+	public Pillagers () {
+		
+		this.config = new Configuration();
+		MinecraftForge.EVENT_BUS.addListener(this::onMobDropsLoot);
+	}
 
     @SubscribeEvent
-    public void onMobKilled (LivingDropsEvent event) {
+    public void onMobDropsLoot (LivingDropsEvent event) {
 
-        // Checks if the initial conditions are right. These conditions include a configurable
-        // probability based on the looting enchantment, the entity being a villager, and the
-        // damage source being from an entity.
-        if (MathsUtils.tryPercentage(this.config.getBasePercent() + this.config.getLootingPercent() * event.getLootingLevel()) && event.getEntityLiving() instanceof EntityVillager && event.getSource().getTrueSource() != null) {
-
-            // A secondary check to see if the damage was from a real player. This check can be
-            // bypassed using the configuration file.
-            if (this.config.areFakePlayersAllowed() ? PlayerUtils.isPlayerDamage(event.getSource()) : PlayerUtils.isPlayerReal(event.getSource().getTrueSource())) {
-
-                final EntityVillager villager = (EntityVillager) event.getEntityLiving();
-                final EntityPlayer player = (EntityPlayer) event.getSource().getTrueSource();
-
-                // No looting kids!
-                if (!villager.isChild()) {
-
-                    final MerchantRecipeList trades = villager.getRecipes(player);
-
-                    // Ensure the villager actually has trades to offer.
-                    if (!trades.isEmpty()) {
-
-                        ItemStack item = new ItemStack(Items.EMERALD);
-                        int attempts = 0;
-
-                        // Makes three attempts to find a valid recipe.
-                        while (attempts < 3) {
-
-                            // Gets a random recipe from the villager's trades with the player.
-                            final MerchantRecipe recipe = trades.get(Constants.RANDOM.nextInt(trades.size()));
-
-                            // Recipe can't be disabled, and must have a buying item and a
-                            // selling item.
-                            if (!recipe.isRecipeDisabled() && !recipe.getItemToSell().isEmpty() && !recipe.getItemToBuy().isEmpty()) {
-
-                                item = recipe.getItemToSell().copy();
-                                break;
-                            }
-
-                            attempts++;
-                        }
-
-                        // Add the item to the list of EntityItem spawned into the world.
-                        EntityUtils.addDrop(item, event);
-                    }
-                }
-            }
+    	final LivingEntity target = event.getEntityLiving();
+    	
+    	if (target instanceof AbstractVillagerEntity && event.getSource() != null && target.world instanceof ServerWorld) {
+    		
+    		final AbstractVillagerEntity villager = (AbstractVillagerEntity) target;
+    		final VillagerProfession profession = villager instanceof VillagerEntity ? ((VillagerEntity) villager).getVillagerData().getProfession() : VillagerProfession.NONE;
+    		final ServerWorld world = (ServerWorld) villager.world;
+    		final Entity killer = event.getSource().getTrueSource();
+    		
+    		if (config.isPlayerRequired() && !(killer instanceof PlayerEntity)) {
+    			
+    			return;
+    		}
+    		
+    		if (config.shouldExcludeFakePlayers() && killer instanceof FakePlayer) {
+    			
+    			return;
+    		}
+    		
+    		if (!config.canLootChildren() && target.isChild()) {
+    			
+    			return;
+    		}
+    		
+    		if (config.isLimitToVillages() && !world.isVillage(target.getPosition())) {
+    			
+    			return;
+    		}
+    		
+    		if (config.isLimitToRaids() && !world.hasRaid(target.getPosition())) {
+    			
+    			return;
+    		}
+    		
+    		if (config.isProfessionRequired() && (profession == null || profession == VillagerProfession.NONE || profession == VillagerProfession.NITWIT)) {
+    			
+    			return;
+    		}
+    		
+    		if (world.rand.nextDouble() < config.getBaseChance() + (event.getLootingLevel() * config.getLootingChance()) + (world.hasRaid(target.getPosition()) ? config.getRaidChance() : 0d)) {
+    			
+    			final MerchantOffers offers = villager.getOffers();
+    			
+    			final int drops = world.rand.nextInt((config.getMaxLoot() - config.getMinLoot()) + 1) + config.getMinLoot();
+    			
+    			for (int i = 0; i < drops; i++) {
+    				
+        			if (offers != null && !offers.isEmpty()) {
+        				
+        				final MerchantOffer offer = offers.get(world.rand.nextInt(offers.size()));
+        				
+        				if (offer != null && !offer.getSellingStack().isEmpty()) {
+        					
+        					event.getDrops().add(new ItemEntity(world, villager.getPosX(), villager.getPosY(), villager.getPosZ(), offer.getSellingStack().copy()));
+        				}
+        			}
+        			
+        			else {
+        				
+    					event.getDrops().add(new ItemEntity(world, villager.getPosX(), villager.getPosY(), villager.getPosZ(), new ItemStack(Items.EMERALD, world.rand.nextInt(7))));
+        			}
+    			}
+    			
+    			if (killer instanceof LivingEntity && world.rand.nextDouble() < config.getBadOmenChance()) {
+    				
+    				((LivingEntity) killer).addPotionEffect(new EffectInstance(Effects.BAD_OMEN, 5 * 60 * 20));
+    			}
+    		}
         }
     }
 }
