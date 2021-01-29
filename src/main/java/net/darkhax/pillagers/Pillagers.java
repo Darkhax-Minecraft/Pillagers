@@ -1,5 +1,7 @@
 package net.darkhax.pillagers;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.item.ItemEntity;
@@ -18,7 +20,10 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ExtensionPoint;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.network.FMLNetworkConstants;
 
 @Mod("pillagers")
 public class Pillagers {
@@ -27,6 +32,7 @@ public class Pillagers {
 	
 	public Pillagers () {
 		
+		ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.DISPLAYTEST, () -> Pair.of(() -> FMLNetworkConstants.IGNORESERVERONLY, (a, b) -> true));
 		this.config = new Configuration();
 		MinecraftForge.EVENT_BUS.addListener(this::onMobDropsLoot);
 	}
